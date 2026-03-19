@@ -36,10 +36,11 @@ class NetValveService : VpnService(), Runnable {
             .addDnsServer("8.8.8.8")
             .addRoute("0.0.0.0", 0)
 
-        // --- THE TARGET LOGIC ---
-        if (!allowedPackage.isNullOrEmpty()) {
+        // --- THE TARGET LOGIC (FIXED) ---
+        val pkg = allowedPackage
+        if (!pkg.isNullOrEmpty()) {
             try {
-                builder.addAllowedApplication(allowedPackage)
+                builder.addAllowedApplication(pkg)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
