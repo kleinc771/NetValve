@@ -10,8 +10,10 @@ import java.nio.ByteBuffer
 class NetValveService : VpnService(), Runnable {
     private var vpnInterface: ParcelFileDescriptor? = null
     private var vpnThread: Thread? = null
+    private var allowedPackage: String? = null
+
     companion object {
-        var throttleDelay: Long = 0 // The "Valve" tightness
+        var throttleDelay: Long = 0
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -20,6 +22,7 @@ class NetValveService : VpnService(), Runnable {
             return START_NOT_STICKY
         }
         throttleDelay = intent?.getLongExtra("DELAY", 0) ?: 0
+        allowedPackage = intent?.getStringExtra("ALLOWED_APP")
         startVpn()
         return START_STICKY
     }
@@ -27,13 +30,22 @@ class NetValveService : VpnService(), Runnable {
     private fun startVpn() {
         if (vpnThread != null) return
         
-        vpnInterface = Builder()
+        val builder = Builder()
             .setSession("NetValve")
             .addAddress("10.0.0.2", 24)
             .addDnsServer("8.8.8.8")
             .addRoute("0.0.0.0", 0)
-            .establish()
 
+        // --- THE TARGET LOGIC ---
+        if (!allowedPackage.isNullOrEmpty()) {
+            try {
+                builder.addAllowedApplication(allowedPackage)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        vpnInterface = builder.establish()
         vpnThread = Thread(this, "NetValveThread")
         vpnThread?.start()
     }
@@ -47,9 +59,8 @@ class NetValveService : VpnService(), Runnable {
             while (!Thread.interrupted()) {
                 val length = input.read(buffer.array())
                 if (length > 0) {
-                    // --- THE VALVE LOGIC ---
                     if (throttleDelay > 0) {
-                        Thread.sleep(throttleDelay) // Hold the packet!
+                        Thread.sleep(throttleDelay)
                     }
                     output.write(buffer.array(), 0, length)
                 }
